@@ -238,7 +238,7 @@ fn send_email_notification(email: &str, date: &str, match_files: &[PathBuf]) -> 
     {
         use std::process::Command;
         
-        let output = Command::new("mail")
+        Command::new("mail")
             .arg("-s")
             .arg(&subject)
             .arg(email)
