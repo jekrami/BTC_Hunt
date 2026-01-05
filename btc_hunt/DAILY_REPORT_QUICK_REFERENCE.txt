@@ -32,13 +32,14 @@ SETUP ON LINUX SERVER:
 
    OR manually:
    crontab -e
-   Add: 59 23 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir . --email your@email.com >> daily_report.log 2>&1
+   Add: 5 0 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir stats --email your@email.com >> daily_report.log 2>&1
+   (Runs at 00:05 AM - after midnight so "yesterday" is correct!)
 
 3. Done! You'll receive daily emails at 11:59 PM
 
 MANUAL TEST:
 -----------
-./target/release/daily_report --log-dir . --email your@email.com
+./target/release/daily_report --log-dir stats --email your@email.com
 
 This will generate a report for YESTERDAY and send email.
 

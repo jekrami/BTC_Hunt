@@ -81,11 +81,13 @@ This will:
 - Generate report
 - Send email
 
-### Cron Setup (Run Daily at 11:59 PM)
+### Cron Setup (Run Daily at 00:05 AM)
 
 ```bash
-59 23 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir stats --email your@email.com >> daily_report.log 2>&1
+5 0 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir stats --email your@email.com >> daily_report.log 2>&1
 ```
+
+**Note:** Runs at 00:05 AM (5 minutes after midnight) to ensure yesterday's log file is complete.
 
 ## Example Log File Lifecycle
 

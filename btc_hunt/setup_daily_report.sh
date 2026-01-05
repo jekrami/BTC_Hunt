@@ -23,8 +23,8 @@ echo "ℹ️  Daily log files: stats/btc_hunt_YYYYMMDD.log"
 echo "ℹ️  Counters reset automatically at midnight"
 echo ""
 
-# Create the cron command
-CRON_CMD="59 23 * * * cd $SCRIPT_DIR && ./target/release/daily_report --log-dir . --email $EMAIL >> daily_report.log 2>&1"
+# Create the cron command (run at 00:05 AM - 5 minutes after midnight)
+CRON_CMD="5 0 * * * cd $SCRIPT_DIR && ./target/release/daily_report --log-dir stats --email $EMAIL >> daily_report.log 2>&1"
 
 echo "Cron job to be added:"
 echo "  $CRON_CMD"
@@ -37,7 +37,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
     echo "✓ Cron job added successfully!"
     echo ""
-    echo "Daily reports will be sent to $EMAIL every day at 11:59 PM"
+    echo "Daily reports will be sent to $EMAIL every day at 00:05 AM"
+    echo "(5 minutes after midnight - ensuring yesterday's log is complete)"
     echo ""
     echo "To view your crontab: crontab -l"
     echo "To edit your crontab: crontab -e"
@@ -49,7 +50,7 @@ fi
 
 echo ""
 echo "Testing daily_report tool..."
-./target/release/daily_report --log-dir . --email "$EMAIL"
+./target/release/daily_report --log-dir stats --email "$EMAIL"
 
 echo ""
 echo "✓ Setup complete!"

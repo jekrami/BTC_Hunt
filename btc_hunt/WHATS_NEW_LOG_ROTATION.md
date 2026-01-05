@@ -110,7 +110,7 @@ That's it! Everything else is automatic.
 You'll still receive emails:
 
 1. **Immediate** (when match found) - from `btc_hunt`
-2. **Daily summary** (11:59 PM) - from `daily_report` cron job
+2. **Daily summary** (00:05 AM) - from `daily_report` cron job
 
 Now the daily summary shows **exactly what happened that day**:
 

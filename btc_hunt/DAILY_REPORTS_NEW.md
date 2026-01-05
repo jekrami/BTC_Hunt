@@ -69,8 +69,10 @@ This will:
 
 2. **Add this line** (adjust path and email):
    ```
-   59 23 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir . --email your@email.com >> daily_report.log 2>&1
+   5 0 * * * cd /path/to/btc_hunt && ./target/release/daily_report --log-dir stats --email your@email.com >> daily_report.log 2>&1
    ```
+   
+   **Note:** Runs at 00:05 AM (5 minutes after midnight) to ensure yesterday's log is complete.
 
 3. **Save and exit**
 
@@ -91,13 +93,13 @@ systemctl status crond     # RHEL/CentOS
 
 ```bash
 cd btc_hunt
-./target/release/daily_report --log-dir . --email your@email.com
+./target/release/daily_report --log-dir stats --email your@email.com
 ```
 
 ### Generate Report Without Email
 
 ```bash
-./target/release/daily_report --log-dir .
+./target/release/daily_report --log-dir stats
 ```
 
 This will create a report file in `reports/` but won't send an email.
