@@ -68,6 +68,51 @@ struct Args {
     simple: bool,
 }
 
+/// Log file manager with daily rotation
+struct LogManager {
+    stats_dir: PathBuf,
+    current_date: Mutex<String>,
+    file: Mutex<Option<File>>,
+}
+
+impl LogManager {
+    fn new(stats_dir: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&stats_dir)?;
+        let today = chrono::Local::now().format("%Y%m%d").to_string();
+        let log_path = stats_dir.join(format!("btc_hunt_{}.log", today));
+        let file = File::create(log_path)?;
+        
+        Ok(Self {
+            stats_dir,
+            current_date: Mutex::new(today),
+            file: Mutex::new(Some(file)),
+        })
+    }
+    
+    fn write_log(&self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let today = chrono::Local::now().format("%Y%m%d").to_string();
+        let mut current_date = self.current_date.lock().unwrap();
+        let mut file_opt = self.file.lock().unwrap();
+        
+        // Check if day has changed
+        if *current_date != today {
+            // Close old file and create new one
+            *file_opt = None;
+            let log_path = self.stats_dir.join(format!("btc_hunt_{}.log", today));
+            *file_opt = Some(File::create(log_path)?);
+            *current_date = today.clone();
+        }
+        
+        // Write to file
+        if let Some(ref mut file) = *file_opt {
+            writeln!(file, "{}", message)?;
+            file.flush()?;
+        }
+        
+        Ok(())
+    }
+}
+
 /// Statistics tracking
 struct Stats {
     mnemonics_generated: AtomicU64,
@@ -75,16 +120,36 @@ struct Stats {
     addresses_checked: AtomicU64,
     batches_processed: AtomicU64,
     start_time: Instant,
+    current_date: Mutex<String>,
 }
 
 impl Stats {
     fn new() -> Self {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         Self {
             mnemonics_generated: AtomicU64::new(0),
             addresses_derived: AtomicU64::new(0),
             addresses_checked: AtomicU64::new(0),
             batches_processed: AtomicU64::new(0),
             start_time: Instant::now(),
+            current_date: Mutex::new(today),
+        }
+    }
+    
+    fn check_and_reset_if_new_day(&self) -> bool {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let mut current_date = self.current_date.lock().unwrap();
+        
+        if *current_date != today {
+            // New day! Reset counters
+            self.mnemonics_generated.store(0, Ordering::Relaxed);
+            self.addresses_derived.store(0, Ordering::Relaxed);
+            self.addresses_checked.store(0, Ordering::Relaxed);
+            self.batches_processed.store(0, Ordering::Relaxed);
+            *current_date = today;
+            true
+        } else {
+            false
         }
     }
 
@@ -457,15 +522,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // Setup statistics logging if requested
-    let log_file = if args.log_stats {
+    let log_manager = if args.log_stats {
         let stats_dir = std::path::PathBuf::from("stats");
-        std::fs::create_dir_all(&stats_dir)?;
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let date_str = chrono::DateTime::from_timestamp(timestamp as i64, 0)
-            .map(|dt| dt.format("%Y%m%d").to_string())
-            .unwrap_or_else(|| format!("{}", timestamp));
-        let log_path = stats_dir.join(format!("btc_hunt_{}_{}.log", date_str, timestamp));
-        Some(Arc::new(Mutex::new(File::create(log_path)?)))
+        Some(Arc::new(LogManager::new(stats_dir)?))
     } else {
         None
     };
@@ -520,21 +579,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Statistics printing thread
     let stats_clone = Arc::clone(&stats);
     let found_clone = Arc::clone(&found);
-    let log_file_clone = log_file.clone();
+    let log_manager_clone = log_manager.clone();
     let stats_interval = args.stats_interval;
     let simple_mode = args.simple;
     std::thread::spawn(move || {
         while !found_clone.load(Ordering::Relaxed) {
             std::thread::sleep(Duration::from_secs(stats_interval));
+            
+            // Check for day change and reset if needed
+            if stats_clone.check_and_reset_if_new_day() && !simple_mode {
+                eprintln!("\n═══ New day started! Counters reset. ═══\n");
+            }
+            
             stats_clone.print_stats(simple_mode);
             
             // Log to file if enabled
-            if let Some(ref log) = log_file_clone {
-                if let Ok(mut file) = log.lock() {
-                    let _ = writeln!(file, "[{}] {}", 
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        stats_clone.to_log_string());
-                }
+            if let Some(ref log_mgr) = log_manager_clone {
+                let log_line = format!("[{}] {}", 
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                    stats_clone.to_log_string());
+                let _ = log_mgr.write_log(&log_line);
             }
         }
     });
@@ -674,19 +738,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Log match found
-            if let Some(ref log) = log_file {
-                if let Ok(mut file) = log.lock() {
-                    writeln!(file, "[{}] 🎉 MATCH FOUND! {} addresses matched",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        found_addresses.len())?;
-                    for addr_match in &found_addresses {
-                        if let Some(balance) = addr_match.balance {
-                            writeln!(file, "[{}]   → {} (Balance: {} BTC)", 
-                                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                                addr_match.address, balance)?;
-                        }
+            if let Some(ref log_mgr) = log_manager {
+                let mut log_msg = format!("[{}] 🎉 MATCH FOUND! {} addresses matched",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                    found_addresses.len());
+                for addr_match in &found_addresses {
+                    if let Some(balance) = addr_match.balance {
+                        log_msg.push_str(&format!("\n[{}]   → {} (Balance: {} BTC)", 
+                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                            addr_match.address, balance));
                     }
                 }
+                let _ = log_mgr.write_log(&log_msg);
             }
 
             // Generate detailed reports
