@@ -520,6 +520,9 @@ fn send_email_notification(email: &str, addresses: &[AddressMatch]) -> Result<()
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    
+    // Print version info at startup (always, even in simple mode)
+    eprintln!("BTC Hunt v{} starting...", env!("CARGO_PKG_VERSION"));
 
     // Setup statistics logging if requested
     let log_manager = if args.log_stats {
@@ -539,7 +542,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !args.simple {
         eprintln!("╔════════════════════════════════════════════════════════════╗");
-        eprintln!("║              Bitcoin Address Hunter v2.0                   ║");
+        eprintln!("║              Bitcoin Address Hunter v{}                  ║", env!("CARGO_PKG_VERSION"));
         eprintln!("║          Unified Mnemonic → Address → Database             ║");
         eprintln!("╚════════════════════════════════════════════════════════════╝");
         eprintln!();
@@ -553,7 +556,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!();
     } else {
         let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-        eprintln!("[{}] BTC Hunt v2.0 starting | DB: {} | Batch: {} | Threads: {} | Log: {}", 
+        eprintln!("[{}] DB: {} | Batch: {} | Threads: {} | Log: {}", 
             timestamp, args.database.display(), args.batch_size, rayon::current_num_threads(),
             if args.log_stats { "enabled" } else { "disabled" });
     }

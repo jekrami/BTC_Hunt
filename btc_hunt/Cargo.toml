@@ -1,6 +1,6 @@
 [package]
 name = "btc_hunt"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 authors = ["Jafar Ekrami <ekrami@gmail.com>"]
 description = "Unified Bitcoin address hunter: generates BIP39 mnemonics, derives addresses, and searches database"
